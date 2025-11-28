@@ -1,0 +1,359 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AE Team Randomizer</title>
+    <!-- Load Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for the spinning effect */
+        .slot-item {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem; 
+            font-weight: bold;
+            color: white;
+            background-color: #3b82f6; /* Blue 500 */
+            border-radius: 0.5rem;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            text-align: center;
+            line-height: 1.2;
+            min-width: 110px; 
+            height: 100px;
+            padding: 0 5px;
+        }
+
+        .is-spinning {
+            animation: spin-content 0.05s infinite linear;
+        }
+
+        @keyframes spin-content {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-100%); }
+        }
+
+        /* Pure CSS Slot Machine Container */
+        .slot-machine-cabinet {
+            background: linear-gradient(to bottom, #4f46e5, #3730a3); /* Indigo gradient */
+            padding: 30px 20px;
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
+            position: relative;
+            margin: 0 auto; /* Center the cabinet in the wider column */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-4 sm:p-8 font-sans">
+
+    <div class="max-w-7xl mx-auto">
+        <h1 class="text-4xl font-extrabold text-center text-gray-800 mb-8">
+            Sales Team Randomizer <span class="text-blue-600">🎰</span>
+        </h1>
+
+        <div id="app-container" class="space-y-8">
+
+            <!-- ####################################################### -->
+            <!-- 1. INPUT VIEW (Visible on Load) -->
+            <!-- ####################################################### -->
+            <div id="input-view" class="max-w-xl mx-auto">
+                <div class="bg-white p-6 rounded-xl shadow-lg h-full">
+                    <h2 class="text-2xl font-semibold text-gray-700 mb-4 border-b pb-2">1. Input Names</h2>
+                    <p class="text-sm text-gray-500 mb-3">Enter Account Executive names, one per line.</p>
+                    <textarea id="nameInput" rows="10" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150" placeholder="e.g.,&#10;Alice Johnson&#10;Bob Smith&#10;Charlie Brown&#10;..."></textarea>
+                    <button id="loadNamesBtn" class="w-full mt-4 py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-xl transition duration-150 shadow-md">
+                        Load Names (Finalize List)
+                    </button>
+                </div>
+            </div>
+
+            <!-- ####################################################### -->
+            <!-- 2 & 3. GAME VIEW (Hidden on Load, 70/30 Split) -->
+            <!-- ####################################################### -->
+            <div id="game-view" class="hidden">
+                <div class="lg:grid lg:grid-cols-10 lg:gap-8 space-y-8 lg:space-y-0">
+                    
+                    <!-- COLUMN 1: 70% Width (Draw Team) -->
+                    <div class="lg:col-span-7 bg-white p-6 rounded-xl shadow-lg flex flex-col items-center">
+                        <h2 class="text-2xl font-semibold text-gray-700 mb-4 border-b w-full text-center pb-2">2. Draw Team</h2>
+
+                        <!-- Available AEs Counter -->
+                        <div class="mb-6 bg-blue-100 text-blue-800 p-3 rounded-xl w-full max-w-lg text-center">
+                            <span class="text-lg font-medium">AEs Remaining: </span>
+                            <span id="aeCount" class="text-3xl font-extrabold">0</span>
+                        </div>
+
+                        <!-- The Slot Machine Reels (Pure CSS) -->
+                        <div class="slot-machine-cabinet w-full mb-8 p-6 relative max-w-lg">
+                            <div class="flex justify-around space-x-4 w-full mx-auto">
+                                <div id="slot1" class="slot-item flex-1">?</div>
+                                <div id="slot2" class="slot-item flex-1">?</div>
+                                <div id="slot3" class="slot-item flex-1">?</div>
+                            </div>
+                        </div>
+
+                        <!-- Spin Button -->
+                        <button id="drawTeamBtn" class="w-full max-w-lg py-4 bg-red-600 hover:bg-red-700 text-white font-bold text-xl rounded-xl transition duration-150 shadow-xl disabled:opacity-50" disabled>
+                            Spin
+                        </button>
+
+                        <!-- Completion Message -->
+                        <div id="completionMessage" class="hidden mt-4 text-center p-4 bg-yellow-100 border border-yellow-300 text-yellow-800 rounded-lg w-full max-w-lg font-medium flex flex-col items-center space-y-4">
+                            <p>Team Draw Complete! No AEs left.</p>
+                            <button id="newDrawBtn" class="py-2 px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-md transition duration-150">
+                                Start New Draw
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- COLUMN 2: 30% Width (Generated Teams) -->
+                    <div class="lg:col-span-3 bg-white p-6 rounded-xl shadow-lg h-full">
+                        <h2 class="text-2xl font-semibold text-gray-700 mb-4 border-b pb-2">3. Generated Teams</h2>
+                        <div id="teamsOutput" class="space-y-4">
+                            <p class="text-gray-500 italic" id="initialOutputMessage">Click "Spin" to draw the first team.</p>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Master lists for team name generation (3 parts) ---
+        const MASTER_CITIES = ["Toronto", "Montreal", "Calgary", "Edmonton", "Ottawa", "Winnipeg", "New England", "Vancouver", "Hamilton", "Quebec City", "New York", "Los Angeles", "Chicago", "Houston", "Phoenix", "Philadelphia", "Regina", "San Antonio", "San Diego", "Dallas", "Austin", "Jacksonville", "San Jose", "Chattanooga", "Columbus", "Charlotte", "Indianapolis", "San Francisco", "Seattle", "Denver", "Oklahoma City", "Nashville", "El Paso", "Washington, D.C.", "Las Vegas", "Boston", "Portland", "Louisville", "Memphis", "Nova Scotia", "Charlottetown", "Detroit", "Baltimore", "Milwaukee", "Albuquerque", "Tucson", "Fresno", "Sacramento"];
+        const MASTER_ADJECTIVES = ["Slick", "Wicked", "Brave", "Salty", "Stinky", "Smooth", "Giant", "Screaming", "Tipsy", "Electric", "Barking", "Ancient", "Fuzzy", "Vivacious", "Futuristic", "Sneaky", "Humble", "Loyal", "Terrible", "Magnificent", "Sparkling", "Sticky", "Sour", "Crispy", "Jolly", "Wild", "Mighty", "Velvet", "Silent", "Glowing", "Mysterious", "Epic", "Furious", "Tenacious", "Clever", "Wet", "Cautious", "Spicy", "Sizzling", "Frozen", "Babbling", "Chilly", "Crying", "Wailing", "Silly", "Hollow", "Squishy", "Frumpy", "Tickled"];
+        const MASTER_FOODS = ["Bagel Bites", "Tacos", "Fries", "Cookies", "Donuts", "Ham", "Spaghetti", "Waffles", "Pretzels", "Hamburgers", "Mangoes", "Jalapeños", "Cabbages", "Cheeseburgers", "Soup", "Pudding Pops", "McNuggets", "Whoppers", "Lunchables", "Lobsters", "Mustard", "Bananas", "Ravioli", "Everything Bagels", "Mayonnaise", "Hot Dogs", "Popsicles", "Popcorn", "Tuna Fish", "Grilled Cheese Sandwiches", "Milkshakes", "Muffins", "Milk", "Onion Rings", "Beef Jerky", "Pancakes", "Peaches", "Ladyfingers", "Grapefruits", "Mozzarella Sticks", "Dumplings", "Gazpachos", "Baked Beans", "Chowder", "Coleslaw", "Lasagna", "Chili Dogs", "Sausages", "Pickles"];
+
+        // Tracking pools to ensure no repetition within a single contest run
+        let availableCities = [];
+        let availableAdjectives = [];
+        let availableFoods = [];
+
+        // Function to generate a random 3-part team name (pure JS, no repetition)
+        function generateLocalTeamName() {
+            // Check if we have enough unique parts left
+            if (availableCities.length === 0 || availableAdjectives.length === 0 || availableFoods.length === 0) {
+                return "The Unnamed Team (Name Pool Empty)";
+            }
+
+            // 1. Select random City and remove it from the available pool
+            const cityIndex = Math.floor(Math.random() * availableCities.length);
+            const city = availableCities.splice(cityIndex, 1)[0];
+            
+            // 2. Select random Adjective and remove it from the available pool
+            const adjIndex = Math.floor(Math.random() * availableAdjectives.length);
+            const adjective = availableAdjectives.splice(adjIndex, 1)[0];
+            
+            // 3. Select random Food and remove it from the available pool
+            const foodIndex = Math.floor(Math.random() * availableFoods.length);
+            const food = availableFoods.splice(foodIndex, 1)[0];
+            
+            return `${city} ${adjective} ${food}`;
+        }
+
+        // --- Global State & DOM Elements ---
+        let availableAEs = [];
+        let teams = [];
+        let teamNumber = 1;
+        let isDrawing = false;
+        
+        const inputView = document.getElementById('input-view');
+        const gameView = document.getElementById('game-view');
+        const nameInput = document.getElementById('nameInput');
+        const loadNamesBtn = document.getElementById('loadNamesBtn');
+        const drawTeamBtn = document.getElementById('drawTeamBtn');
+        const aeCountDisplay = document.getElementById('aeCount');
+        const teamsOutput = document.getElementById('teamsOutput');
+        const initialOutputMessage = document.getElementById('initialOutputMessage');
+        const completionMessage = document.getElementById('completionMessage');
+        const newDrawBtn = document.getElementById('newDrawBtn'); 
+
+        const slots = [
+            document.getElementById('slot1'),
+            document.getElementById('slot2'),
+            document.getElementById('slot3')
+        ];
+
+        // --- Utility Functions ---
+
+        // Function to update the available AE count display and button state
+        function updateUIState() {
+            aeCountDisplay.textContent = availableAEs.length;
+
+            if (availableAEs.length === 0) {
+                drawTeamBtn.disabled = true;
+                completionMessage.classList.remove('hidden');
+            } else if (!isDrawing) {
+                drawTeamBtn.disabled = false;
+                completionMessage.classList.add('hidden');
+            }
+        }
+
+        // Function to simulate the slot spinning
+        function startSpinning(slotElement, duration) {
+            let spinInterval;
+            let currentNameIndex = 0;
+            const tempNames = availableAEs.length > 0 ? availableAEs : ["AE1", "AE2", "AE3", "AE4", "AE5", "?", "...", "TEAM"]; 
+            
+            slotElement.classList.add('is-spinning');
+            
+            spinInterval = setInterval(() => {
+                currentNameIndex = (currentNameIndex + 1) % tempNames.length;
+                slotElement.textContent = tempNames[currentNameIndex];
+            }, 50); 
+            
+            return new Promise(resolve => {
+                setTimeout(() => {
+                    clearInterval(spinInterval);
+                    slotElement.classList.remove('is-spinning');
+                    resolve();
+                }, duration);
+            });
+        }
+
+        // --- Event Handlers ---
+
+        // Handler for the "Start New Draw" button
+        newDrawBtn.addEventListener('click', () => {
+            // Reset state
+            availableAEs = [];
+            teams = [];
+            teamNumber = 1;
+            teamsOutput.innerHTML = '';
+            
+            // Switch view back to input screen
+            gameView.classList.add('hidden');
+            inputView.classList.remove('hidden');
+            
+            // Set the default names back into the input field
+            nameInput.value = "Abby\nCatherine\nElie\nGerry\nHarlin\nJaden\nJake\nJennifer\nJonah\nKushal\nLuke\nSean";
+            updateUIState();
+        });
+
+
+        // 1. Load Names Handler
+        loadNamesBtn.addEventListener('click', () => {
+            const rawNames = nameInput.value;
+            
+            availableAEs = rawNames.split('\n')
+                                   .map(name => name.trim())
+                                   .filter(name => name.length > 0);
+            
+            if (availableAEs.length === 0) {
+                 return;
+            }
+
+            // --- Reset Name Pools for Repetition Check ---
+            // Create fresh copies of the master lists
+            availableCities = [...MASTER_CITIES];
+            availableAdjectives = [...MASTER_ADJECTIVES];
+            availableFoods = [...MASTER_FOODS];
+            // ----------------------------------------------
+
+            // Shuffle the AE list
+            for (let i = availableAEs.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [availableAEs[i], availableAEs[j]] = [availableAEs[j], availableAEs[i]];
+            }
+
+            teams = [];
+            teamNumber = 1;
+            teamsOutput.innerHTML = '';
+            initialOutputMessage.classList.remove('hidden');
+            
+            slots.forEach(slot => slot.textContent = '?');
+            
+            // --- View Switching ---
+            inputView.classList.add('hidden');
+            gameView.classList.remove('hidden');
+
+            updateUIState();
+        });
+
+        // 2. Draw Team Handler (now triggered by the Spin button click)
+        drawTeamBtn.addEventListener('click', async () => {
+            if (isDrawing || availableAEs.length === 0) return;
+
+            isDrawing = true;
+            drawTeamBtn.disabled = true;
+
+            const selectedNames = [];
+            const drawnAEs = [];
+            const totalSlots = 3;
+            
+            const namesToDraw = Math.min(availableAEs.length, totalSlots);
+
+            for (let i = 0; i < namesToDraw; i++) {
+                drawnAEs.push(availableAEs[i]);
+            }
+            
+            availableAEs.splice(0, namesToDraw); 
+
+            // --- Slot Spinning and Sequential Reveal ---
+            
+            await startSpinning(slots[0], 1000);
+            const name1 = drawnAEs[0] || '?';
+            slots[0].textContent = name1;
+            selectedNames.push(name1);
+
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await startSpinning(slots[1], 1000);
+            const name2 = drawnAEs[1] || '?';
+            slots[1].textContent = name2;
+            selectedNames.push(name2);
+
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await startSpinning(slots[2], 1000);
+            const name3 = drawnAEs[2] || '?';
+            slots[2].textContent = name3;
+            selectedNames.push(name3);
+            
+            // --- Final Output and State Update ---
+
+            await new Promise(resolve => setTimeout(resolve, 1000)); 
+
+            const teamId = 'team-' + teamNumber;
+            teams.push({ id: teamId, names: selectedNames });
+            
+            // --- Generate Name Locally (Unique City + Adjective + Food) ---
+            const generatedName = generateLocalTeamName();
+
+            const teamElement = document.createElement('div');
+            teamElement.id = teamId;
+            teamElement.className = 'p-3 bg-gray-50 border border-gray-200 rounded-lg shadow-sm';
+            
+            teamElement.innerHTML = `
+                <div class="flex flex-col space-y-1">
+                    <div class="flex items-center">
+                        <p class="font-bold text-lg text-purple-600">${generatedName}</p>
+                        <span class="text-gray-700 font-normal ml-2">(${selectedNames.join(', ')})</span>
+                    </div>
+                </div>
+            `;
+            
+            teamsOutput.prepend(teamElement);
+            initialOutputMessage.classList.add('hidden');
+            
+            teamNumber++;
+            isDrawing = false;
+            updateUIState();
+        });
+
+        // Initial setup on load
+        window.onload = () => {
+            // Set the provided default names into the input field
+            nameInput.value = "Abby\nCatherine\nElie\nGerry\nHarlin\nJaden\nJake\nJennifer\nJonah\nKushal\nLuke\nSean";
+            updateUIState();
+            // Start in the input view
+            gameView.classList.add('hidden');
+            inputView.classList.remove('hidden');
+        };
+
+    </script>
+</body>
+</html>
